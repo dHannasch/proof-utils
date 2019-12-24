@@ -1,0 +1,1033 @@
+% David Hannasch  hannasc2@illinois.edu  07/27/2011
+% To use, put everything in the same directory as your .tex file and put \input{proofUtils} in the preamble.
+% The required packages are all installed on the MUSes, \emph{except} for cleveref.sty and environ.sty, which should have come with this file.
+
+% Primary goal: allow readers to read math at lightning speed.
+% Secondary goal: allow writers to write math at lightning speed.
+
+\NeedsTeXFormat{LaTeX2e}[1994/06/01]
+\ProvidesPackage{proofUtils}[2011/07/27 description] % The description of a package is put into the log file. These descriptions are also displayed by the \listfiles command.
+
+% packages with supportive commands for development of more macros http://www.ctan.org/topic/macro-supp
+% \usepackage{locality} \makecommandslocal{list of macros (no separator)}{code}
+% Every token in the first argument is made local to <code>; changes made to their definitions do not persist outside of <code>.
+% \RequirePackage{somedefs} if the command \bar needs the command \foo, you could say:
+% \DeclareOption{bar}{\UseDefinition{bar}\UseDefinition{foo}}
+% \usepackage{xargs} allows multiple optional arguments via \newcommandx*\coord[3][1=1, 3=n]{(#2_{#1},\ldots,#2_{#3})}
+
+%\usepackage{etextools} % builds upon etex and etoolbox
+\usepackage{etoolbox}
+% etextools should be considered as an experimental package. In particular, it's not a good idea to write a package that require etextools. etoolbox is the opposite: growing number of packages depend on it
+% \robustify, \expandonce, patching of commands
+% \ifstrequal from etoolbox doesn't work in all circumstances where \ifthenelse{\equal{}{}} works
+% \ifthenelse is fragile (but can be declared robust?)
+% \section{\ifthenelse{\equal{a}{a}}{b}{c}} doesn't work; \DeclareRobustCommand\titleIf{\ifthenelse{\equal{a}{a}}{b}{c}} \section{\titleIf}?
+
+% etoolbox \newbool etc are backward-compatible with ifthen et alia; etoolbox \newtoggle etc are not backward-compatible
+
+\newtoggle{reviewCopy}
+%\DeclareOption{draft}{\newcommand{\reviewCopy}{true}}
+\DeclareOption{draft}{\toggletrue{reviewCopy}}
+\newtoggle{beamer}
+\DeclareOption{beamer}{\toggletrue{beamer}}
+\newtoggle{dontUseGeometryToWiden}
+\DeclareOption{nogeometry}{\toggletrue{dontUseGeometryToWiden}}
+\newtoggle{numberTheoremsSequentially}
+\DeclareOption{nonumberwithin}{\toggletrue{numberTheoremsSequentially}}
+%\DeclareOption{algebra}{\usepackage{algebra}} % to condense to one file, replace this with a toggle and put optional content at end of this file or use \AtEndOfPackage
+
+% cannot \ProcessOptions twice, so since need to know some options to decide what to do below, must use \AtEndOfPackage to define commands that depend on stuff below
+\DeclareOption{complex}{\AtEndOfPackage{
+\newcommand{\composedWith}{\circ}
+\newcommand{\convolution}[2]{#1*#2}
+\DeclareMathOperator{\sign}{sign}
+% LaTeX commands cannot start with `\end'
+\newcommand{\closeIntegral}[1]{\thinspace\mathrm{d}#1} % argument is name of variable integrating over
+\newcommand{\complexConjugate}[1]{\overline{#1}}
+\newcommand{\fourierTransform}[1]{\widehat{#1}}
+}}
+% is it actually a good idea to do these here rather than define new commands for each document?
+% pro: don't have to look up anything, just remember eg \inject
+% pro: can copy-paste freely between documents
+% con: if eg change a command to take two arguments rather than have it placed between them, will break all previous documents that used that command
+% using \DeclareOption IS superior to having a separate algebra.sty, just for reasons of keeping track of files
+% using \DeclareOption is superior to cluttering namespace with lots of minor commands
+\DeclareOption{algebra}{\AtEndOfPackage{ % requires amsmath
+\DeclareMathOperator{\Hom}{Hom}
+\DeclareMathOperator{\Aut}{Aut}
+\DeclareMathOperator{\img}{img}
+
+\newcommand{\subgp}{\leq}
+\newcommand{\propersubgp}{<}
+\newcommand{\normalsubgp}{\unlhd}
+\newcommand{\propernormalsubgp}{\vartriangleleft}
+\newcommand{\iso}{\cong}
+\newcommand{\directsum}{\oplus}
+\newcommand{\semidirect}[1][]{\rtimes_{#1}}
+
+\newcommand{\surject}[1][]{\xtwoheadrightarrow[#1]{}}
+\newcommand{\inject}[1][]{\xhookrightarrow[#1]{}}
+\newcommand{\isoArrow}{\xrightarrow{\sim}}
+
+\newcommand{\algClosure}[1]{\overline{#1}}
+
+\newcommand{\fieldAdjoin}[2]{#1\left(#2\right)}
+\newcommand{\fieldExt}{\inject[\mathrm{id}]} % id should not inherit properties of surrounding text
+% don't want to do this with two arguments, then couldn't chain $k \fieldExt I \fieldExt F$
+\newcommand{\extDeg}[2]{\left[ #1 : #2 \right]} % degree of #1 over #2
+\newcommand{\automorphismsFixing}[2]{\Aut_{#1}\left(#2\right)} % automorphisms fixing #1 of #2
+}}
+\DeclareOption{linearalgebra}{\AtEndOfPackage{
+\newcommand{\matrixSpc}[3]{\mathcal{M}_{#1 \times #2}(#3)} % can just do eg \mathbb{R}^{m \times n}
+\newcommand{\scalarProd}[2]{\left\langle #1 \mid #2 \right\rangle}
+\newcommand{\norm}[2][]{\left\lVert #2 \right\rVert_{#1}}
+\newcommand{\transpose}[1]{#1^\intercal}
+\newcommand{\generalInv}[2][]{#2^{\dagger_{#1} } } % generalized inverse
+\newcommand{\generalOrtho}[2][]{#2^{\perp_{#1} } } % generalized orthogonal complement
+\newcommand{\rank}[1]{\operatorname{rank} #1}
+\DeclareMathOperator{\Span}{Span}
+\newcommand{\inlineVec}[1]{\begin{pmatrix} #1 \end{pmatrix} } % would be nice to be able to specify () or []
+}}
+\DeclareOption{graphCmds}{\AtEndOfPackage{
+\newcommand{\maxDegree}[1]{\Delta\negthinspace\left(#1\right)} % \negthinspace to eliminate the space \left puts between function name and left-paren
+\newcommand{\minDegree}[1]{\delta\negthinspace\left(#1\right)} % \negthinspace to eliminate the space \left puts between function name and left-paren
+\newcommand{\subgraphOf}{\subseteq}
+\newcommand{\inducedSubgraphOf}{\xrightarrow{\sim}}
+}}
+\DeclareOption{probability}{\AtEndOfPackage{
+\newcommand{\prob}[2][]{\mathbb{P}\mathbf{r}_{#1}\left\{#2\right\}}
+\newcommand{\condProb}[3][]{\mathbb{P}\mathbf{r}_{#1}\left\{#2 \mathrel{}\middle\vert\mathrel{} #3\right\}}
+\newcommand{\expect}[2][]{\mathbb{E}_{#1}\left[#2\right]}
+\newcommand{\condExpect}[3][]{\mathbb{E}_{#1}\left[#2 \mathrel{}\middle\vert\mathrel{} #3\right]}
+\DeclareMathOperator{\Cov}{Cov}
+}}
+
+\ProcessOptions\relax
+
+% can pass on options to other packages
+% If a package file contains no \DeclareOption* then, by default, each specified but undeclared option for that package will produce an error.
+% For example, to pass every unknown option on to the article class, you can use \DeclareOption*{ \PassOptionsToClass{\CurrentOption}{article} }
+
+
+% \def is much more powerful than \newcommand:
+% \def\mycmd #1: #2#3    \mycmd {blah}: {foo}{bar}
+% see newcommand.py for a better way to generate needed \def
+
+
+
+% if two packages redefine a LaTeX command, the package that is loaded last will dominate
+
+% this file may eventually be split into two, one which loads packages in such a way that they all work together and one that defines semantic macros like contraEnv
+% where LaTeX looks for packages: http://www-h.eng.cam.ac.uk/help/tpl/textprocessing/configuring.html
+% somehow use IfFileExists to load a package ONLY if the file is found, and to generate a warning otherwise
+% \IfFileExists{filename}{true}{false}
+
+% use \protect in \PackageWarning as in \protect\foo is \foo
+
+% \RequirePackage[options]{package}[date] use date to be sure that the version is up-to-date enough to have the features you use
+
+
+\usepackage{xifthen}%\usepackage{ifthenx} % most systems do not have ifthenx
+% ifthenx is complementary to xifthen, in that they provide different facilities; the two may be loaded in the same document, as long as xifthen is loaded first.
+% xifthen allows more conditional tests, I'm sticking with the original ifthen for now because old systems are more likely to have it
+% While nowadays the ifthen package is sometimes deprecated (e.g., see the March 2011 stackexchange.com conversation on this topic),
+%  Setting aside its downsides (particularly, the care needed when using it inside fragile contexts), positives include:
+%  1. it provides a simple mechanism for assembling complex logical expressions, i.e., those employing \AND, \OR, \NOT and \( ... \)
+%  2. more uniform grammar than etoolbox's syntax. E.g., compare
+%       \ifboolexpr{ test {\ifnumcomp{\value{mycounter}}{>}{3}}}...
+%     with
+%       \ifthenelse{\value{mycounter} > 3}...
+%  3. string expansion semantics (cf., etoolbox that does not)
+%  4. it is relatively lightweight compared to, say, the might of etoolbox (although note that ifthenx uses etoolbox's \patchcmd if already loaded).
+
+
+%\usepackage{xparse} % Google latex xparse
+% xparse seems to require LaTeX3
+% \NewDocumentCommand allows much more flexible optional arguments
+% \DeclareDocumentCommand\sec{ m g }{{#1 \IfNoValueF{#2}{ and #2} }}
+% The argument { m g } defines the arguments of \sec; m means "mandatory argument" and g is "optional braced argument". \IfNoValue(T)(F) can then be used to check whether the second argument was indeed present or not.
+
+\usepackage{environ}
+% \NewEnviron{test}[3][]{"#1,#2,\BODY,#3"}
+% \begin{test}[zero]{one}{last} three\par four \end{test} Produces the equivalent of: "zero,one,three\par four,last"
+% if use \newcommand inside \NewEnviron definition, must double #'s for each level of nesting
+% PROBLEM: environments defined by NewEnviron cannot be nested, and what's more, TeX goes into an infinite loop if you nest them
+%  because both assign to \BODY
+% because of this, always use \newenvironment{name}{at start}{at end} unless that won't work
+% do need \NewEnviron for eg using \ifthenelse
+%\usepackage{ltxtools-environ} might solve the nesting problem, but can't find documentation and most systems don't have it
+
+
+% defining a new environment (with base LaTeX or environ package) defines two new commands \name and \endname, so can't have environment and command of same name
+
+\IfFileExists{multido.sty}{
+\usepackage{multido}
+}
+% remember that LaTeX already has \whiledo, and tikz comes with \foreach
+
+
+
+
+% debugging: trace package?
+% http://tex.stackexchange.com/questions/538/how-to-best-debug-latex
+
+\newtoggle{debugging}
+%\newcommand{\debugging}{true}
+% debugging flag: make commands more verbose, eg \findDefn will not clean up the LaTeX.temp file, so it can be read to see what Python is outputting
+\newcommand{\ifDebug}[2]{\iftoggle{debugging}{#1}{#2}}
+%\newcommand{\ifDebug}[2]{\ifthenelse{\isundefined{\debugging}}{#2}{#1}}
+%\ifDebug{\tracingmacros=1}{} % logs macro expansion in log file; slows doen LaTeX horribly, and the log isn't enlightening
+\ifDebug{\addtocounter{errorcontextlines}{10}}{}
+
+
+%\newcommand{\ifDraft}[2]{\ifthenelse{\isundefined{\reviewCopy}}{#2}{#1}}
+\newcommand{\ifDraft}[2]{\iftoggle{reviewCopy}{#1}{#2}}
+
+%\newcommand{\reviewCopy}{true} % define this to make margins wider and show \reviewComments
+% could put \reviewCopy setting as option passed, after I know how
+% the `draft' option can be passed to most documentclasses; could this work off of that option?
+% with `draft' on, overfull hboxes are marked by a vertical bar in the margin, imported picture files are indicated only by an outline
+% so, probably don't want to use [draft], because then won't be able to see embedded EPS
+%\newcommand{\reviewComment}[1]{\ifthenelse{\isundefined{\reviewCopy}}{}{\todo{#1}}}
+%\newcommand{\reviewComment}[1]{\ifthenelse{\isundefined{\reviewCopy}}{}{\marginpar{\raggedright\footnotesize #1}}}
+\newcommand{\reviewComment}[1]{\ifDraft{\marginpar{\raggedright\footnotesize #1}}{}}
+
+\newenvironment{grayOut}{\color{gray}}{} % must not use \NewEnviron, because this will be used in the definition of another \NewEnviron
+\NewEnviron{hiddenDetails}{\ifDraft{\begin{grayOut}\BODY\end{grayOut} }{} } % cannot 
+
+
+\newlength{\draftLeftShift}\setlength{\draftLeftShift}{0.5in}
+\newlength{\marginExpandLen}\setlength{\marginExpandLen}{0.25in}
+\iftoggle{beamer}{}{ % maybe better to \iftoggle{beamer}{\toggletrue{dontUseGeometryToWiden}}{}
+\ifDraft{
+\usepackage[left=1in-\draftLeftShift,right=1in+{\draftLeftShift}+\marginExpandLen,top=1in,bottom=1in]{geometry} % only works for one-sided layout, then extra-wide right margin where all marginpars will appear
+}{
+\iftoggle{dontUseGeometryToWiden}{}{
+\usepackage[left=1in,right=1in,top=1in,bottom=1in]{geometry}
+}
+}
+}
+% \rightmargin is defined as a length, but if don't set \rightmargin here, then \the\rightmargin is always zero, weird
+\setlength{\rightmargin}{1in+{\draftLeftShift}+\marginExpandLen}
+% \marginparwidth must be slightly less than \rightmargin, since marginpar is slightly spaced away from the edge of the body text
+\setlength\marginparwidth{\rightmargin-0.25in} % this will only work when \leftmargin = \rightmargin; I cannot figure out how to get hold of the length of the margin where the marginpar will actually appear
+% \marginpar:
+% For one-sided layout (simplex), the text will be placed in the right margin, starting from the line where it is defined. For two-sided layout (duplex), it will be placed in the outside margin and for two-column layout it will be placed in the nearest margin.
+% To swap the default side, use \reversemarginpar and margin notes will then be placed on the opposite side, which would be the inside margin for two-sided layout.
+% If the text of your marginpar depends on which margin it is put in (say it includes an arrow pointing at the text or refers to a direction as in "as seen to the left..."), you can use \marginpar[left text]{right text} to specify the variants.
+% If the text of your marginpar depends on which margin it is put in (say it includes an arrow pointing at the text or refers to a direction as in "as seen to the left..."), you can use \marginpar[left text]{right text} to specify the variants.
+% \marginpar creates a special kind of float, so it cannot be used e.g. in other floats or footnotes.
+% \marginnote to does not use a kind of float, but there might be other problems
+\usepackage{marginnote} % \marginnote may be used instead of \marginpar at almost every place where \marginpar cannot be used, e.g. inside floats, footnotes
+%\usepackage{mparhack} % mparhack implements a workaround for the LaTeX bug that marginpars sometimes appear on the wrong margin.
+% mparhack does not work with multicol package
+
+\ifDraft{}{\PassOptionsToPackage{disable}{todonotes}}
+%\usepackage{todonotes}
+% \todo uses \marginparwidth, so changing that affects todos
+
+%\let\oldtodo\todo
+%\renewcommand{\todo}[1]{\ifDraft{\oldtodo{#1}}{}}
+
+\ifDraft{}{
+\renewcommand{\marginnote}[1]{}
+}
+
+
+% http://tex.stackexchange.com/questions/8188/evaluating-a-string-to-a-command
+
+
+
+
+
+
+
+% to use the fix-cm package, load it before \documentclass, and use the command \RequirePackage to do so, rather than the normal \usepackage
+% Do not to load any other package before the document class, unless you have a thorough understanding of the LATEX internals and know exactly what you are doing!
+
+
+
+
+% at the moment, the python package doesn't seem as promising as using \write18 to call a .py file, see below
+% with TeX's \write, can pass arguments to Python via command line, or if more complicated, write to a file and pass the file name to Python via command line
+
+% look into perltex package
+%\usepackage{python}
+% sometimes need this as first line of .tex: %& -shell-escape
+% could try the other way around: use Python's os.system to call pdflatex (but note that Kile does fancy stuff that you'll lose)
+% look into newcommand.py
+
+%\newcommand{\defineWord}[2]{
+%\begin{python}%
+%word = "#1"
+%print "\\newcommand{\\" + word + "}{" + word + "}"
+%\end{python}
+%}
+\newcommand{\execPython}{ % \execPython{print "Hello"} gives a weird error
+\begin{python}
+print "Hello";
+sys.exit(0);
+\end{python}
+blahfoo
+}
+\def\htysrhrtshsdfhfg{\end{python}}
+%\execPython
+%\htysrhrtshsdfhfg
+
+% \end{python} is taken as Python code
+% from .py.err file:
+%   File "<stdin>", line 1
+% print "Hello"; \endgroup \immediate \closeout \@out \immediate \openout \@module =latex.py \immediate \write \@module {jobname="MATH581HW3"} \immediate \closeout \@module \immediate \write 18{cat  MATH581HW3.py | python > MATH581HW3.py.out 2> MATH581HW3.py.err} \immediate \let \reserved@d =\bgroup \def \openin \@inputcheck  \def \let \def \let cls\relax \edef article{}
+% SyntaxError: unexpected character after line continuation character
+
+
+
+
+
+
+% talk about calling scripts from LaTeX: http://stackoverflow.com/questions/4016725/latex-immediate-evaluation
+% someone mentions PerlTeX
+
+
+
+% \immediate\write18 for shell commands
+% shell escape must be enabled
+
+% when using ./example.py, Python file must have execute permission: chmod u+x example.py
+
+\usepackage{verbatim,moreverb}
+% \begin{verbatimwrite}{filename} writes all text in its body to a file, the name of which it is given as an argument.
+% The \verb command may not be used in the argument of another command, so how can I pass string literals to Python?
+
+
+\newwrite\outputstream
+\newcommand{\writeToFile}[2]{
+{
+\immediate\openout\outputstream=#1 % deletes anything that was in the file before
+\immediate\write\outputstream{#2}
+\immediate\closeout\outputstream
+} % \outputstream passes out of scope
+}
+
+%\newread\inputstream
+%\immediate\openin\inputstream=myfile.tmp
+%\immediate\read\inputstream to \auxcommand
+%This is the first line of the file: \auxcommand
+%\immediate\closein\inputstream
+
+
+% the \string command could help to write $$ to file, but it's very limited, \string{blah only applies \string to the { character
+
+\newcommand{\findDefn}[1]{
+\immediate\write18{rm LaTeX.temp} % if there was something in there before, need to delete it
+\immediate\write18{rm wantedDefns.temp} % if there was something in there before, need to delete it
+\writeToFile{wantedDefns.temp}{#1}
+\immediate\write18{./findDefn.py wantedDefns.temp > LaTeX.temp} % this is only for UNIX, need alternate shell cmd for Windows
+%\immediate\write18{./findDefn.py #1 > LaTeX.temp} % this is only for UNIX, need alternate shell cmd for Windows
+\input{LaTeX.temp}
+%\immediate\openin\myinput=LaTeX.temp
+%\immediate\closein\myinput
+\ifDebug{}{\immediate\write18{rm -f -- 'LaTeX.temp'} } % UNIX only, comment out to see the file
+}
+% problem: if the argument to \findDefn contains $ etc, LaTeX processes it instead of passing it
+% maybe try writing to file instead of using command line?
+
+
+
+
+\usepackage{varioref} % \vref{sec:example} provides standard \ref plus page number
+% varioref defines \vref which uses \ref, hyperref redefines \ref, so they're compatible
+% varioref does not support hyperref * variants, so vref's page numbers will always be hyperlinks if you load both packages
+
+% \vref{thm:blah}($Q_d$) does not work, since \vref inserts `on the previous page' etc
+% could we still do \vref{thm:blah} ($G = Q_d$) ? that may be the only option, but I don't like that because it introduces extraneous notation; the $\ell$ from the stmt of thm:blah shouldn't have to follow it to every use, we might use $\ell$ to mean something else there
+% on the other hand, Python does this; how do they deal with the same name refering to both a formal parameter and a current variable?
+
+% since a PS file cannot contain hyperlinks, hyperref cannot be used with LaTeX => PS => PDF, which you must use if you have EPS figures
+\iftoggle{beamer}{}{\usepackage[pdfauthor={David A. Hannasch (proofUtils)}]{hyperref}}
+% \href[options]{URL}{text}  The text is made a hyperlink to the URL; this must be a full URL (relative to the base URL, if that is defined). The special characters # and ˜ do not need to be escaped in any way.
+% \hyperref[label]{text} text is made into a link to the same place as \ref{label} would be linked.
+
+% To go BACK from a hyperlink in Adobe Reader, press Alt + left arrow.
+% "Back" and "Forward" buttons can also be added to the toolbar in Adobe Reader. If you right-click on the tool bar, under "more tools," "page navigation toolbar," they are referred to as "previous view" and "next view."
+
+\hypersetup{pdfborder = 0 0 0} % third number is thickness of box around links
+% probably best to make most links invisible, and highlight particular links as needed
+%citebordercolor RGB color 0 1 0
+%The color of the box around citations
+%filebordercolor RGB color 0 .5 .5
+%The color of the box around links to files
+%linkbordercolor RGB color 1 0 0
+%The color of the box around normal links
+%menubordercolor RGB color 1 0 0
+%The color of the box around Acrobat menu links
+%urlbordercolor RGB color 0 1 1
+%The color of the box around links to URLs 
+% hycolor package allows eg `red' instead of 0 0 1, but I don't foresee much need for that at the moment
+\hypersetup{pdfkeywords = {compiled with proofUtils}}
+
+% \autoref{label}  can ref Figure, Table, Equation, item, section, paragraph, page
+% \autoref works via the counter name, chooses the wrong name if the counter is used for different things, exempli gratia \newtheorem if lemmas share a counter with theorems
+% \usepackage{aliascnt} \newaliascnt{lemma}{theorem} \newtheorem{lemma}[lemma]{Lemma} \aliascntresetthe{lemma} \providecommand*{\lemmaautorefname}{Lemma}
+% \autopageref{label}
+% \hyperref[other]{that nice section (\ref*{other}) we read before}  \ref*{other} to generate the correct number, but not to form a link, since we do this ourselves with \hyperref
+
+% hyperref causes warnings when using math mode in section titles
+% hyperref takes the text for bookmarks from the arguments of commands like \section, which can contain things like math, colors, or font changes, none of which will display in bookmarks as-is.
+% fix with \texorpdfstring{TeXstring}{PDFstring}
+% \section{\texorpdfstring{$P_4$}{P4}-free graphs}
+
+% mathematician heard that his twenty-year-old conjecture had been proven, proved it in twenty minutes without looking at the proof
+% experiment: lock mathematicians in separate rooms, tell one that it's been proven true and the other that it's been proven false
+% http://tex.stackexchange.com/questions/1013/how-to-typeset-subscript-in-usual-text-mode
+
+\usepackage{xcolor}
+\definecolor{defn}{rgb}{0,0.5,0.2}
+\definecolor{thm}{named}{green}
+% example using the wave color model: \definecolor{blah}{wave}{580}
+%\definecolorset{rgb}{}{}{defn,0,0.5,0.2; thm,}
+% \colorlet{tableheadcolor}{gray!25}
+% \colorbox{background color}{text}
+% \fcolorbox{frame color}{background color}{text}
+% Note that in some cases the current color is of rather limited use, e.g., the construction of an \fcolorbox implies that at the time when the background color is evaluated, the current color equals the frame color; in this case ‘.’ does not refer to the current color outside the box.
+
+% I think a good rule of thumb would be to hyperlink (with a red frame) only the first time a term is used in a proof, and then only if the definition appears on an earlier page.
+%\newcommand{\firstUseLink}[1]{\fcolorbox{red}{white}{#1} } % would be great if I could somehow auto-detect whether the enclosed was a hyperlink, but on the other hand, why call attention to a jargon in a proof if I'm not linking to the defn?
+% \fcolorbox destroys math mode?
+% By Corollary 2.3.13 (West, page 184), $G$ contains a 2-factor if and only if \firstUseLink{$\fmOdd$}$ - \sum_{v \in T} d_{G - S}(v) \leq 2(|S| - |T|)$ for all disjoint $S, T \subseteq V(G)$.
+% doing multiple $ like that makes screwy spacing
+\newcommand{\firstUseLinkMath}[1]{\fcolorbox{red}{white}{\(#1\)} } % works in the middle of math mode; there must be a more elegant solution than using a separate cmd
+\newcommand{\firstUseLink}[1]{\TextOrMath{\fcolorbox{red}{white}{#1} }{\fcolorbox{red}{white}{\(#1\)} }} % should handle both text mode and math mode correctly
+
+%\newcommand{\firstUse}[1]{\textbf{#1} } % this is clumsy, results in \firstUse{$\deficiency$}$ = ...$
+% but \bf in math mode removes the math mode
+% what is \firstUse for, really? will I ever use it when a term is first used in a proof?
+
+% \linkcmd{\qdim}{\operatorname{qdim}}{defn:qdim}
+% \linkcmd[1]{\doubleStar}{\text{doubleStar}(#1)}{defn:doubleStar}
+% \linkcmd[2]{\doubleStar}{\text{doubleStar}(#1, #2)}{defn:doubleStar}
+\newcommand{\linkcmd}[4][0]{
+\newcommand{#2}[#1]{\hyperref[#4]{#3}\xspace}
+}
+% for plural of linked word, use eg the sum of the {\longestPathLen}s of $u,v$
+\newcommand{\defineWord}[3]{
+\linkcmd{#1}{#2}{defn:#2}
+\begin{defn}\label{defn:#2}
+#3
+\end{defn}
+}
+
+\usepackage{amsthm}
+% ntheorem is buggy, incompatible with amsthm
+% ntheorem has more features but more bugs: http://tex.stackexchange.com/questions/5599/theorem-packages-which-to-use-which-conflict
+\usepackage{fixltx2e} % fixltx2e must be loaded AFTER amsthm 2.20; conflict with other versions unknown
+
+\usepackage[capitalise]{cleveref}
+% Wherever you would previously have used \ref, use \cref instead. (Except at the beginning of a sentence, where you should use \Cref.)
+% To typeset multiple cross-references, simply list the labels inside the \cref, separated by commas (you are not allowed to use commas in label names when using cleveref); do NOT use spaces to separate, since spaces are legal in LaTeX labels
+% \crefname{type}{singular}{plural}\Crefname{type}{singular}{plural}
+% The reference type is usually the name of the counter for the environment (equation, chapter, section, etc.). The exceptions are appendices, labels whose type has been overridden by the optional argument to \label, and theorem-like environments when the ntheorem or amsthm package is loaded, for which type should instead be the environment name (lemma, corollary, definition)
+% to override reference type: \label[type]{label}
+\crefname{inequality}{Inequality}{Inequalities}  % \label[inequality]{merten}
+\creflabelformat{inequality}{\textup{#2(#1)#3}}
+% could define inequality environment that temporarily redefines \label with \let\oldlabel
+
+% Note that varioref is fully supported by cleveref, just that cleveref's features supersede varioref's \labelformat feature.
+% if varioref is loaded, cleveref redefines the \vref, \vrefrange, \fullref commands and variants to instead use the cleveref features for cross-reference formatting, whilst retaining all the varioref page-referencing magic.
+% cleveref must be loaded after varioref
+% cleveref does not modify the standard \ref command
+% cleveref has poorman for when you need to send .tex file to someone without cleveref.sty (complicated, read manual)
+% When both the amsmath and hyperref packages are loaded, \cref gives fatal errors when used within section titles. If anyone can figure out why, let me know!
+% cleveref doesn't know about the subfloat package, so you have to revert to using \ref for cross-references to sub-figures.
+% The beamer document class redefines the \label command in a particularly devious way that breaks cleveref's optional argument to that command.
+
+\usepackage{xspace}
+% \newcommand{\cage}{\hyperref[defn:cage]{cage}\xspace}
+
+
+
+
+%\usepackage{mathtools}
+% the mh bundle fixes various deficiencies of amsmath
+% mh = mhsetup + mathtools + (mathstyle + flexisym + breqn) + empheqn
+% Empheq allows sophisticated boxing and other marking of multi-line maths displays, eg placing braces to the side of several lines that scale to the size of those lines
+% breqn: automatic line-breaking of displayed math
+% Breqn uses the mathstyle package to keep track of the current maths typesetting style, something that raw TeX hides from the programmer.
+% flexisym is required by breqn: turns math symbols into macros (?)
+% mathtools: Starred versions of the amsmath matrix environments for specifying the column alignment, multlined (need to specify width, see documentation), cases-like environments, new gathered environments
+% mathtools' tag-only-referenced-eqns feature sounds great but is buggy: the use of the showonlyref introduces a bug allowing formulas to be typeset close to or over the equation number
+
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{textcomp} % \text{\textdied}
+\newcommand{\cancelMinus}{\mathop{\text{\textdied}}}
+\iftoggle{beamer}{}{
+\usepackage{wasysym} % \Square
+}
+%\PassOptionsToPackage{boxempty}{stmaryrd} % extpfeil package loads stmaryrd with options, so we do this to prevent an option clash
+% extpfeil automatically loads stmaryrd, and stmaryrd causes weird errors, so replace extpfeil with mathtools, which provides all the extensible arrows except the double-headed ones.
+% proofUtils should \RequirePackage{version of extpfeil recent enough to have what it needs}
+% if have old version of extpfeil installed, gets weird undefined control sequence error that gets line number end of main file instead of properly giving the line number
+% extarrows provides xLeftrightarrow, xleftrightarrow, xlongequal
+%\RequirePackage{extpfeil}[2009/10/31 v0.4] % \xtwoheadrightarrow, \xtwoheadleftarrow, \xmapsto, \xlongequal, \xtofrom
+\RequirePackage{mathtools}[2008/08/01 v1.06]
+\makeatletter
+\@ifpackagelater{mathtools}{2009/10/31}{% only the date matters, the version number is ignored
+    % Package is new enough
+}{%
+    \PackageError{mathtools}{proofUtils requires mathtools 2009/10/31.}{help text}%
+}
+\makeatother
+% superscript is mandatory, subscript is optional, just as with \xrightarrow
+% \newextarrow{\arrowname}{<spacing>}{<arrowdef>}
+% \newextarrow{\injectsucc}{5599}{\succ\relbar\rightarrow}
+% <spacing> should be a list of four numbers (single tokens or {}-groups), giving (in this order):
+% - additional space left of the arguments
+% - additional space right of the arguments
+%   -> those are used to justify the sub/superscripts after creating the arrow
+% - additional space left of the arguments
+% - additional space right of the arguments
+%   -> those are used to determine the length of the arrow.
+% I don't understand the difference between the first and third arguments - maybe only the sum of both matters.
+%All numbers are interpreted as mu (math units).
+%<arrowdef> should be a list of three symbols (single tokens or {} groups), giving (in this order):
+% - left end of the arrow
+% - middle part of the arrow (will be multiplicated; you usually want \relbar or \Relbar)
+% - right end of the arrow.
+
+\iftoggle{beamer}{}{
+\newcommand{\CartProd}{\tikz{  \node[inner sep = 0pt, outer sep = 0pt] {\small \(\square\)};  }}
+}
+
+\usepackage{tikz}
+% use \begin{tikzpicture}[xscale = 2] to scale entire picture left-right by 2; this seems to be an unnecessary feature, since you can always enclose the whole thing in a \scalebox
+% if have tikzpicture too big for a page, use \clip and copy picture to second page with macro or \foreach (using \clip to show whatever wasn't shown on the first page)
+\usetikzlibrary{arrows,shapes}
+%\usetikzlibrary{fit}
+%\usetikzlibrary{positioning}
+%\usetikzlibrary{matrix}
+\tikzstyle{implyArrow}=[->, double, double equal sign distance]
+\tikzstyle{zeroSize}=[minimum size = 0pt, inner sep = 0pt]
+\tikzstyle{blkCircle}=[circle, fill=black!100, minimum size = 4pt, inner sep = 0pt]
+\tikzstyle{emptyCircle}=[circle] % draw option actually makes graph ugly
+
+% tikz auto-includes graphicx
+\iftoggle{beamer}{}{ % subfig loads the caption package, caption + beamer + hyperref have a problem
+% It turns out subfig has problems with hyperref in many situations not just when using Beamer,
+% including at CCS.
+% \usepackage{subfig} can result in an error being reprted at the \begin{document} line saying undefined control sequence \begin{document}.
+% To avoid dealing with this, it's best to just use subcaption.
+\usepackage{subcaption}
+% subfig replaced the subfigure package
+}
+% cleveref doesn't know about subfig, so you have to \cref{fig:pete}\subref{subfig:peteRound1}
+% subfig vs subcaption: http://tex.stackexchange.com/questions/13625/subcaption-vs-subfig
+% https://tex.stackexchange.com/questions/13625/subcaption-vs-subfig-best-package-for-referencing-a-subfigure
+
+%\usepackage{rotating} % tries to make the interface for rotation simpler
+% \begin{turn}{angle} rotates, \begin{rotate}{angle} and \turnbox{angle}{} rotate but in a box of zero size, so that the contents overlap the surroundings
+
+
+%\usepackage[toc,page]{appendix} % toc to add an Appendices: line to table of contents, page to put a title when appendices begin
+% appendix package provides appendices environment
+% The subappendices environment allows you to put separate appendices for a particular section, coded as \subsections
+
+
+
+
+
+%\usepackage{sproof}
+% requires sproof.sty, sref.sty, metakeys.sty
+% sister package: statements
+% and see other sTeX (semantic TeX) packages
+
+%\usepackage{lineno}
+% lineno and amsmath do not get along: http://phaseportrait.blogspot.com/2007/08/lineno-and-amsmath-compatibility.html
+
+% consistent numbering makes it easy for people to find things, but even better to use hyperref
+% maybe not use the default \theoremstyle for theorems, because the italics can make it harder to read
+\iftoggle{numberTheoremsSequentially}{
+\newtheorem{thm}{Theorem}
+\newtheorem{lem}{Lemma}
+\newtheorem{cor}{Corollary}
+}
+{
+\newtheorem{thm}{Theorem}[section]
+\newtheorem{lem}[thm]{Lemma}
+\newtheorem{cor}[thm]{Corollary}
+}
+\crefname{thm}{Theorem}{Theorems} % don't need \Crefname, because it already does thms right; \crefname is just to make it capitalize
+\crefname{lem}{Lemma}{Lemmata}\Crefname{lem}{Lemma}{Lemmata} % even with the capitalise option, \cref won't capitalize Lemma unless forced here
+\crefname{cor}{Corollary}{Corollaries}\Crefname{cor}{Corollary}{Corollaries}
+
+\newtheorem{folk}{Folklore Theorem}[section] % need something for result that will be used but cannot be put to a particular source
+\crefname{folk}{Folklore Theorem}{Folklore Theorems}\Crefname{folk}{Folklore Theorem}{Folklore Theorems}
+%\newtheorem* does not create a `hook' for \label{}'s, so cannot \vref a named thm
+% need to be able to put \ in theorem name, eg M\"{o}bius inversion? in that case, use codeNamedThm
+\NewEnviron{namedThm}[1]{\newtheorem*{#1}{#1} % seems to be no problem with having spaces in LaTeX's internal environment name
+\begin{#1}
+\BODY
+\end{#1}
+}
+% problem: if the name of the theorem contains \, then cannot use it for LaTeX's internal name
+%\NewEnviron{setupCodeNameRef}[1]{ \creflabelformat{#1}{#2 \BODY #3} }
+\NewEnviron{codeNamedThm}[2]{\newtheorem*{#2}{#1} % seems to be no problem with having spaces in LaTeX's internal environment name
+%\crefname{#2}{#1}{#1} % some kind of problem when there are {} in name, eg M\"{o}bius
+% I cannot make references work, but name should be enough
+% since all I want from ref is page number, maybe bypass cref and work with vref
+%\creflabelformat{#2}{Dattegato}
+%\begin{setupCodeNameRef} #1 \end{setupCodeNameRef}
+\begin{#2}
+\BODY
+\end{#2}
+}
+
+
+\theoremstyle{remark} % applies to following \newtheorems
+% \theoremstyle{remark} does not have numbering, so does not create hooks for labels
+\newtheorem*{rmk}{Remark} % need something for `interesting but not used'
+\iftoggle{beamer}{}{
+\newtheorem*{fact}{Fact} % need something for `prove by basic computation, used often without citing by number'
+}
+\newtheorem*{obsv}{Observation} % need something for `short noncomputational proof, used often without citing by number'
+\newtheorem{prop}[thm]{Proposition} % need something for `simple proof, cited often'
+\crefname{prop}{Proposition}{Propositions}\Crefname{prop}{Proposition}{Propositions}
+\newtheorem{ques}{Question}
+\crefname{ques}{Question}{Questions}\Crefname{ques}{Question}{Questions}
+\newtheorem{conj}{Conjecture}
+\crefname{conj}{Conjecture}{Conjectures}\Crefname{conj}{Conjecture}{Conjectures}
+\newtheorem{cond}{Condition}
+\crefname{cond}{Condition}{Conditions}\Crefname{cond}{Condition}{Conditions}
+
+\theoremstyle{definition}
+\newtheorem{defn}{Definition} % \label defns and \ref later
+\crefname{defn}{Definition}{Definitions}\Crefname{defn}{Definition}{Definitions}
+\newtheorem{localDefn}{Definition}[section] % sometimes we don't want a defn to extend beyond the current section, eg 581HW#5 2 Subdivisions
+\crefname{localDefn}{Definition}{Definitions}\Crefname{localDefn}{Definition}{Definitions}
+
+% problem: doing cases this way means that you sometimes have to manually reset case numbering
+% see below for alternative using enumitem
+% when using cases, probably don't need arrow to end or other delimiter, because we know the first case has ended when the next case begins
+\newtheorem{case}{Case}
+\crefname{case}{Case}{Cases}
+\newtheorem{subcase}{Subcase}\numberwithin{subcase}{case}
+\newtheorem{subsubcase}{Subsubcase}\numberwithin{subsubcase}{subcase}
+\makeatletter
+\@addtoreset{case}{thm} % this works because Lemma and Corollary use the thm counter
+% currently, case resets when thm increments, not when I start a new proof
+% as for \labeledClaim, \proveImplication, etc, I might want to use those inside a claim, so don't automatically reset case numbering
+% can manually reset case numbering with \setcounter{case}{0} (see below)
+\makeatother
+%\begin{case}
+%\begin{subcase}
+%\end{subcase}
+%\end{case}
+% \setcounter{case}{0} resets case counter in the middle of a proof, but causes bizarre warning
+\newtheorem*{baseCase}{Base Case} % maybe overkill, but I want baseCase to match case and sometimes base case is lengthy
+% example: We will induct up by 2 with each step, so we need two base cases.
+%\begin{baseCase}{$k = 3$.}
+%Then $T_k = K_2$, and any complete graph on fewer than 3 vertices is $P_3$-saturated.
+%\end{baseCase}
+%\begin{baseCase}{$k = 4$.}
+%Then $T_k = K_{1, 3}$, which is $P_4$-saturated by \vref{thm:P_3-freeStarForest=>P_4-saturated}.
+%\end{baseCase}
+
+
+% don't want to do Claims with \newtheorem, because I like the $\therefore$ blah at the end, good for navigation
+
+
+
+% When you use the itemize environment in LaTeX your items (\item) will automatically be indented about 2em.
+% sometimes you want the items to be aligned with the text, such as when the list extends over more than one page
+%\NewEnviron{flushenum}{ % note: this pushes the labels into the margin
+%\begin{list}{\labelitemi}{\leftmargin=0em}
+%\BODY
+%\end{list}
+%}
+% \leftmargin: distance from the left edge of the current environment to the left margin of the item body?
+%  one site said to left edge of item label, but experiments do not bear that out
+% \rightmargin: Distance from the right edge of the current environment to the right margin of the item body. Defaults to 0.
+% \labelwidth: Width allotted to the label. This should be set at least as long as the longest expected label.
+%  The amount by which \labelwidth exceeds the longest label does not effect how far labels are pushed to the left. The only effect of an extra-large \labelwidth is that it can accommodate extra large-labels.
+%  I originally thought that labelwidth was used to decide where to put later lines in an item body, but setting labelwidth=0em seems to do nothing
+% \labelsep: The distance between the rightmost part of the label (assuming you haven't changed the label from its default right justification) to the left margin of the item body. BEWARE: This setting enforces this distance by shoving the label left rather than moving the body left margin right. If you set this you might need to add a corresponding amount to \leftmargin, if you want your labels in a specific place.
+% \listparindent: The indent of the first line of each paragraph in an item, except for the first paragraph of an item.
+% \itemindent: pushes around the item label and first line relative to the other lines
+% enumitem package adds a new length, \labelindent, which otherwise is automatically computed from other values
+%  if you set \labelindent with enumitem, other lengths are recomputed around it
+
+\makeatletter% must be outside \if
+\iftoggle{beamer}{}{ % enumitem + beamer causes TeX-capacity-exceeded in convoluted way that doesn't always happen http://tex.stackexchange.com/questions/52274/dealing-with-long-description-environment-items
+\RequirePackage{enumitem}[2011/09/28 v3.5.2]
+% However, it will only print a warning text and not cause an error if the installed version is older than the requested version.
+\@ifpackagelater{enumitem}{2011/09/28}{% only the date matters
+    % Package is new enough
+}{%
+    \PackageError{enumitem}{Package enumitem is too old ...}{help text}%
+}%
+% Note that despite the name \@ifpackagelater, AFAIK, the macro checks actually if the package date is later or equal. A more accurate name would be therefore ifpackagenotolder.
+
+% \begin{proofcases} \case \case \end{proofcases}
+% \emph{can} \cref items like thms, but need to tell cleveref to call them Case
+% need to handle subcases correctly, currently does not
+% http://tex.stackexchange.com/questions/26665/a-question-about-customizing-ref-in-enumitem-package
+% easy to get eg 1.1.3. using label*, but then how to get the Case in there?
+
+% Ben Lerner is doing the same thing, might be worthwhile to talk to him: http://tex.stackexchange.com/questions/18460/using-cleveref-with-enumitems-newlists
+\newlist{proofcases}{enumerate}{3}
+\setlist[proofcases]{wide, labelindent=0em, before={\renewcommand{\case}{\item}}}
+\setlist[proofcases,1]{label=\textbf{Case \arabic{proofcasesi}:}, ref=Case \arabic{proofcasesi}}
+\setlist[proofcases,2]{label=\textbf{Case \arabic{proofcasesi}.\arabic{proofcasesii}:}, ref=Case \arabic{proofcasesi}.\arabic{proofcasesii}}
+\setlist[proofcases,3]{label=\textbf{Case \arabic{proofcasesi}.\arabic{proofcasesii}.\arabic{proofcasesiii}:}}
+% since Case is already in the ref=, cleveref doesn't need to do anything, but it gives a warning if it doesn't have some name, so just give it the empty string
+\crefname{proofcasesi}{}{}\crefname{proofcasesii}{}{}
+% if it turns out I want to \cref multiple cases, come back here and remove Case from ref= and give it to \crefname
+
+\ifthenelse{0 = 1}{
+\NewEnviron{proofcases}{ % could use \newlist, \setlist, but then couldn't use \case for \item
+\providecommand{\appendIfNonzero}{}
+\renewcommand{\appendIfNonzero}[1]{\ifthenelse{##1 > 0}{.\arabic{##1}}{}}
+\providecommand{\case}{}
+\renewcommand{\case}{\item: } % might be able to do this with before=, but before= has not been extensively tested
+\begin{enumerate}[wide, labelindent=0em, label=\textbf{Case \arabic{enumi}}] % mysterious errors when I tack on \appendIfNonzero{enumii}
+\BODY
+\end{enumerate}
+}
+}{}
+
+}
+\makeatother
+% enumitem is generally prefered over paralist: http://tex.stackexchange.com/questions/18411/what-are-the-differences-between-using-paralist-vs-enumitem
+% MUSes have an old version of enumitem, not the latest version
+% latest version includes the wide option and the =! autocalculate option
+% wide means align=left, leftmargin=0pt, labelindent=\parindent, listparindent=\parindent, labelwidth=0pt, itemindent=!
+% Of course, these keys can be overriden after wide, too; for example, remembering that with left-aligned labels the text is pushed if the they are wider than labelwidth, you can set labelwidth=1.5em for a minimal width, or instead of itemindent=! you may prefer itemindent=*, which sets the minimal width to that of widest label.
+% The value assigned with label= is a moving argument, and fragile commands must be protected, except the counters.
+% \the or \ifnum expects an actual value
+% The best solution is usually encapsulating the logic inside a new \counter" with the help of \AddEnumerateCounter
+% By default, label sets also the form of cross references and \the... (overriding the settings in previous hierarchical levels), but you can define a different format with ref=.
+
+% \newlist{name}{base type}{max depth}
+% \setlist[names, levels]{key=value, key=value}
+% appears that if you use setlist, it does not use the counters enumi, enumii, etc, so I can't figure out how to properly set labels using the value of upper-level counters (id est Case 3.1.2)
+
+% add an optional argument to each of these that will be passed on to enumerate to set item labels
+\NewEnviron{marginenum}{ % define this because remembering what leftmargin does is hard
+\begin{enumerate}[leftmargin=0em]
+\BODY
+\end{enumerate}
+}
+\NewEnviron{flushenum}{
+\begin{enumerate}[wide, labelindent=0em] % wide is defined as long as have enumitem 3.0 or later
+\BODY
+\end{enumerate}
+}
+
+
+
+
+
+
+
+% problem: \begin{proof} eats all whitespace that comes after it, including \phantom{blah} and \xspace
+% what about \mbox{}?
+% for now, only solution is to include an introductory overview paragraph at beginning (not a bad idea regardless)
+% cannot put a \\, LaTeX says `there's no line here to end'
+% this means that, for example, if the entire proof is a contraEnv, then you will get a badbox
+
+
+% possibility: give claims labels for hyperlinks? check hyperref documentation
+% numbers aren't natural for claims, better to use \spadesuit, \clubsuit, \bigstar, etc; how can I put tag in argument so that later \ref will use it?
+
+\newcommand{\claimRepeated}[2]{
+
+% using \paragraph{} for Claim: forces you to not put a Claim: as the first line of a proof, which is good for style, but the LaTeX error (`missing \item') gives no clue as to the real problem, so bad for usability
+\textbf{Claim:} #1 % instead of using \\, could just put \noindent on next line; that would reduce badbox issues
+
+\noindent #2
+
+\noindent \(\therefore\) #1
+}
+\NewEnviron{claimEnv}[1]{\claimRepeated{#1}{\BODY}}
+\newcommand{\labeledClaim}[3]{ % for when we reference a claim repeatedly, but don't want to make it a lemma
+
+\paragraph{Claim #1:} #2 \\  % when call, do not put endl after third {, put endl before third {
+#3
+
+\noindent \(\therefore\) #1
+
+}
+
+% towards a solution preventing arrows starting on the wrong page:
+%\usepackage{expl3}\usepackage{l3seq}
+% Sequences can be used as stacks, where data is pushed to and popped from the top of the sequence.
+% The stack functions for sequences are not intended to be mixed with the general ordered data functions detailed in the previous section: a sequence should either be used as an ordered data type or as a stack, but not in both ways.
+% \seq_new:N{sequence}
+%   Creates a new {sequence} or raises an error if the name is already taken. The declaration is global.
+% \seq_pop:NN{sequence}{token list variable}
+%   Pops the top item from a {sequence} into the {token list variable}. Both of the variables are assigned locally (so when leave current context top item will return?). If {sequence} is empty an error will be raised.
+% \seq_push:NV{sequence}{item}
+%   Adds the {item} to the top of the {sequence}.
+% it appears that you can't use \ExplSyntaxOn and \ExplSyntaxOff inside a macro eg \newcommand{\blah}{\ExplSyntaxOn\ExplSyntaxOff}
+% so you would have to do a global \ExplSyntaxNamesOn
+
+%\ExplSyntaxNamesOn % hope this doesn't screw anything up
+%\seq_new:N{\pageStackForArrows}
+
+\iffalse
+discussion of lineno.sty that might be relevant for arrowToEnd's problem when the end of it is the first thing on the next page:
+lineno.sty does it by pretending that the current page ends after each and every line. This keeps TEX quite busy, but works.
+Often, you want the line numbers to depend on the page they finally end up. E.g., you want the numbers to start with 1 one each new page
+This is an almost impossible demand, but lineno.sty can do it, at some cost, in terms of computing time, memory, and disk space.
+lineno.sty needs to write a note into the auxiliary file for each line in the numbered part of the text, and TEX keeps some memory for each page, and all that takes some computation time to figure out on which page the line was in the last LATEX run.
+\fi
+
+% For every picture that defines or uses external nodes, you'll have to apply the 'remember picture' style. To avoid some typing, we'll apply the style to all pictures.
+%\tikzstyle{every picture}+=[remember picture] % for \arrowToEnd, need [remember picture] option when placing nodes AND when overlaying the arrow
+% \linewidth is the width of the text in the current environment. \textwidth is the width in the overall document.
+\newcounter{arrowDepth}
+\newcounter{arrowStartPage} % currently only one counter, this doesn't work for nested where only the outer one breaks across a page
+\newcounter{innerArrowStartPage} % not elegant, only supports single nested arrowToEnd, but TeX doesn't seem to have a stack data structure
+\newcommand{\arrowToEnd}[2]{\noindent %\begin{minipage}{\linewidth} % don't break line
+% only effect of minipage seems to be that it prevents new paragraphs from indenting normally; leave minipage commented out and see what happens
+% should width be \linewidth or \linewidth - \parindent? if \linewidth, then \noindent
+\addtocounter{arrowDepth}{1} %
+% store \thepage to prevent arrow starting on the wrong page:
+%\thepage
+%\newcommand{\currPage}{\thepage}
+%\seq_push:NV{\pageStackForArrows}{\currPage} % global \ExplSyntaxNamesOn
+\ifthenelse{\value{arrowDepth} > 1}{ % check whether we're starting an inner arrowToEnd inside an outer arrowToEnd; change this if move \addtocounter{arrowDepth}{1} lower
+\setcounter{innerArrowStartPage}{\value{page}}
+}{ %
+\setcounter{arrowStartPage}{\value{page}} %
+} %
+\noindent \tikz[remember picture]{  \node (arrowBegin\alph{arrowDepth}) {};  } #1
+% \\*, just like \\, causes a `There's no line here to end.' error if #1 ends with a blank line, so insert \hspace{0pt} or similar to hack around that
+\hspace{0pt} \\* % \\* is the same as \\ except that it tells LaTeX not to start a new page after the line http://www.personal.ceu.hu/tex/breaking.htm
+\nopagebreak % still problem if #2 is very first thing on a page: for some reason page counter hasn't incremented
+\noindent \tikz[remember picture]{  \node (arrowDest\alph{arrowDepth}) {};  } #2  % arrow points to whatever goes in #2
+%\seq_pop:NN{\pageStackForArrows}{\pageArrowIsFrom}
+%\pageArrowIsFrom  % check whether it's what it should be
+%arrowStartPage = \arabic{arrowStartPage}, page = \arabic{page}
+\ifthenelse{\ifnumgreater{\value{arrowDepth}}{1}{\value{innerArrowStartPage}}{\value{arrowStartPage} } = \value{page} }{ % if we're in an inner arrowToEnd, then compare innerArrowStartPage to page, else compare arrowStartPage to page
+% TikZ only works with one page at a time, so if an arrow would break across a page, it gets wonky
+\begin{tikzpicture}[overlay,remember picture]
+\path[->] (arrowBegin\alph{arrowDepth}) edge [bend right] (arrowDest\alph{arrowDepth});
+\end{tikzpicture}
+}{}
+%\end{minipage}
+\addtocounter{arrowDepth}{-1}
+}
+\NewEnviron{arrowToEndEnv}[1][]{\arrowToEnd{\BODY}{#1}}
+
+\newcommand{\contradiction}[2]{
+\mbox{} % hack to prevent \begin{proof} from putting minipage into the right margin
+
+\noindent \arrowToEnd{\textbf{Assume that} #1.
+#2
+}
+{\Large \raisebox{2pt}{\(\longrightarrow\longleftarrow\)} }
+}
+\NewEnviron{contraEnv}[1]{\contradiction{#1}{\BODY}}
+% usage: \begin{contraEnv}{statement that we are assuming} Blah blah thus 0 = 1. \end{contraEnv}
+
+\newcommand{\proveImplication}[3]{
+\mbox{} % hack to prevent \begin{proof} from putting minipage into the right margin
+
+\noindent \arrowToEnd{\textbf{Assume that} #1.
+#3
+}
+{\(\therefore\) #1 \(\Longrightarrow\) #2}
+}
+\NewEnviron{proveImplEnv}[2]{\proveImplication{#1}{#2}{\BODY}}
+
+
+% \induction{base case}{inductive hypothesis}{conclusion}{body}
+\newcommand{\induction}[4]{
+\textbf{Base case:} #1
+\proveImplication{#2}{#3}{#4}
+}
+% generally, want to name objects in stmt of thm, but this makes induction look odd
+% induction would look better if said `Let $G$'... \emph{inside} the induction block; then induction stmt could be `Every connected graph with a dominating set of size $m$'...
+% \begin{thm}\label{thm:connectedleq3m-2}($G$, $m$)
+% Let $G$ be a connected graph with a dominating set of size $m$.
+\NewEnviron{inductEnv}[3]{\induction{#1}{#2}{#3}{\BODY}}
+
+% extra-long inductive step: use claim instead of proveImplication?
+
+
+
+
+%%%%%%% bibliography %%%%%%
+% make \cite give name and year: \bibliographystyle{apalike or apasoft or decsci or jtbnew or neuron or cell or plainnat or abbrvnat or ametsoc or humanbio or these}
+% make \cite initials and year: \bibliographystyle{amsalpha or alpha or is-alpha or annotate}
+% make \cite initials (no year): \bibliographystyle{alphanum}
+% make \cite abbreviated name and year: \bibliographystyle{wmaainf}
+%\bibliographystyle{amsalpha}
+
+%\usepackage{amsrefs}
+% compatible with the �showkeys�, �hyperref�, and �backrefs� packages
+% implements the functionality of the �cite� package
+% bibliography style is controlled completely through LaTeX instead of being determined partly by a BibTeX stylefile and partly through LaTeX
+% AMSRefs-format database is a valid LaTeX document that can be printed directly
+% \bibselect{...} instead of \bibliography{...}
+% more info: ftp://ftp.ams.org/ams/doc/amsrefs/amsrefs-slides.pdf
+
+
+
+
+\NewEnviron{equivEqns}{
+\renewcommand{\iff}{\\ \Longleftrightarrow &&} % this passes out of scope at the end of the environment
+\begin{align*}
+&& \BODY
+\end{align*}
+}
+\iffalse % doesn't work and I don't know how to do \align* \endalign* as commands
+\newenvironment{equivEqns}{\renewcommand{\iff}{\\ \Longleftrightarrow &&}
+\begin{align*}
+&&}{\end{align*}}
+\fi
+\iffalse % example of use of equivEqns:
+\begin{equivEqns}
+k &\geq d + 2sd - (s - 1)k \iff
+sk &\geq (2s + 1)d \iff
+\frac{k}{d} &\geq \frac{2s + 1}{s} = 2 + \frac{1}{s}
+\end{equivEqns}
+\fi
+
+\NewEnviron{eqnsOneLabel}[1]{ % eg differential equation and initial conditions
+\begin{equation}\label[eqnsOneLabel]{#1}
+\begin{gathered}
+\BODY
+\end{gathered}
+\end{equation}
+}
+\crefname{eqnsOneLabel}{Equations}{Equations}
+\creflabelformat{eqnsOneLabel}{\textup{#2(#1)#3}}
+
+
+
+
+
+
+
+
+
+
+
+% DeclareMathOperator* means that _ and ^ will be placed below/above, like \sum
+% \DeclareMathOperator must always go in preamble, so can't put these in defn.tex, but can define linkcmds to be \operatorname{blah}
+% since \DeclareMathOperator does not allow me to to add an automatic hyperlink, \linkcmd with \operatorname is probably better in most cases
+\DeclareMathOperator{\lcm}{lcm}
+\DeclareMathOperator{\erf}{erf}
+\DeclareMathOperator{\df}{df}
+\DeclareMathOperator{\defic}{def}
+\DeclareMathOperator{\ch}{ch}
+\DeclareMathOperator{\ex}{ex}
+\DeclareMathOperator{\Var}{Var}
+\DeclareMathOperator{\diam}{diam}
+\DeclareMathOperator{\Res}{Res}
+
+\renewcommand{\lg}{\log_2} % \lg is by default a math operator
+\renewcommand{\Re}{\operatorname{Re}} % by default, \Re and \Im produce funky symbols that I guess are used by some people for real and imaginary parts
+\renewcommand{\Im}{\operatorname{Im}}
+
+\newcommand{\floor}[1]{{\left\lfloor #1 \right\rfloor}}
+\newcommand{\ceil}[1]{{\left\lceil #1 \right\rceil}}
+\newcommand{\angleBrackets}[1]{{\left\langle #1 \right\rangle}}
+%\newcommand{\abs}[1]{\left\lvert #1 \right\rvert}
+\newcommand{\sizeof}[1]{\left\lvert #1 \right\rvert}
+\newcommand{\intersect}{\cap} % A \intersect B
+\newcommand{\intersection}{\bigcap} % \intersection_{a \in A} f(a)
+
+\newcommand{\symDiff}{\vartriangle}
+\newcommand{\adjacentTo}{\leftrightarrow}
+
+%\IfFileExists{etextools.sty}{}{}
+%\IfFileExists{etextools.sty}{
+%\usepackage{etextools}
+%\newcommand{\setComp}[1]{\ifOneChar{##1}{##1^\complement}{\left(##1\right)^\complement} } % with # doubled, no error but always false; with # single, error
+%}{
+%}
+\newcommand{\setComp}[1]{\overline{#1}} % ^\complement is hard, because need to decide whether need parentheses
+\newcommand{\conjugate}[1]{\overline{#1}} % ^\complement is hard, because need to decide whether need parentheses
+%}
+\newcommand{\atMost}[1]{\operatorname{atMost}\negthinspace\left(#1\right)}
+
+\newcommand{\eitherWord}[2]{\(\angleBrackets{ \begin{array}{c} % could use \TextOrMath{}{} to render insides in text mode if we start in text mode or math mode if we start in math mode, but really this macro shouldn't be used in math mode at all, because it might look like a math construct
+\text{#1} \\
+\text{#2}
+\end{array} }\)} % for when a theorem is true for either word, eg let $M$ be the \eitherWord{maximum}{minimum} number of...
+
+%\newcommand{\FibAdj}[1]{\hat{F}_{#1}} % \FibAdj{0} = 1, \FibAdj{1} = 1
+% \FibAdj{n} = \Fib{n + 1}
+%\newcommand{\Fib}[1]{F_{#1}} % \Fib{0} = 0, \Fib{1} = 1
+
+
+
+
+
+
+% \jobname has the name of the primary TeX file being compiled, stripped of the .tex extension
+% http://www.tex.ac.uk/cgi-bin/texfaq2html?label=filename
+% The currfile package provides a regular means of keeping track of the details of the current file (its name in \currfilename, directory in \currfiledir)
+
+% \jobname could be used to call a preprocessor on the .tex file, but the original would still go to latex
+% perhaps better soln: redefine \begin{document} to call the preprocessor on \BODY and pass the result to latex
+
+% patching existing commands: http://www.tex.ac.uk/cgi-bin/texfaq2html?label=patch
+
+% actually, ted may not be what we want here, because there's nothing to substitute
+% perhaps use the patchcmd package instead
+% first figure out what we want to change to: write \BODY to a file, call Python/Perl on file, take preprocessor's output
+
+\usepackage{ted}
+\ifthenelse{0 = 1}{
+The ted package is a token list editor, and provides a command \substitute which will patch the contents of a macro, putting the result in a token-list, or (in the form \Substitute*) using the result to (re)define a macro. The following example defines a simple macro, and then changes its definition:
+
+\newcommand{\myfont}%
+    {\Large\sffamily\selectfont}
+\Substitute*[\renewcommand{\myfont}]{\myfont}%
+    {\Large\sffamily}{\huge\itshape}
+The macro's definition is now:
+
+\huge\itshape\selectfont
+The package also offers a command \ShowTokens, which shows the content of its argument, one token to a line, with details of the token's category code, etc. This is recommended as a debugging tool.
+
+http://mirror.unl.edu/ctan/macros/latex/contrib/ted/ted.pdf
+\Substitute<*>[definingCmd]{input}{toBeReplaced}{replacedWithThis}
+ definingCmd{input} must be a legal syntax for an assignment
+ what does this mean? if you want your output to be placed in a macro, it should not contain improperly placed hash signs (that is, macro parameter tokens)
+ 
+ The one-starred form of \Substitute is meant to help you when your input is not an explicit token list, but the contents of either a macro or a \toks register, by expanding once its first mandatory argument before proceeding. It spares you the pain of using \expandafters
+ two-starred form expands its three mandatory arguments once before executing
+ 
+\ShowTokens<*>{list}
+ see table on page 3 of ted documentation
+}{}
+
+%\newcommand{\myfont}{ Large sffamily selectfont}
+%\Substitute*[\renewcommand{\myfont}]{\myfont}{ Large sffamily}{ huge itshape}
+
+
+
+
+% options
+
+\allowdisplaybreaks
+
+\everymath{\displaystyle} % This is important when using TikZ. By default, all math in TikZ nodes are set in inline mode, including small fractions, so it can be difficult to read.
+% I like typesetting all math in display style, which is easier to read but results in uneven line spacing, which some people think is ugly. To disable this, comment out \everymath{\displaystyle}.
+
+\newcommand{\isHW}{true} % comment this out to remove all \probPart{}s
+\newcommand{\ifHW}[1]{\ifthenelse{\isundefined{\isHW}}{}{#1}}
+\newcommand{\probPart}[1]{\ifHW{\noindent{\large\textbf{\thesection(#1)} } } }
+
+
+
+
+
+
+
+
+
+
